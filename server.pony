@@ -1,35 +1,22 @@
 use "http"
 use "files"
+use "collections"
 
 actor Main
-  """
-  A simple HTTP server.
-  """
   new create(env: Env) =>
     let service = try env.args(1)? else "3000" end
     let limit = try env.args(2)?.usize()? else 1000 end
-    let host = "localhost"
-
-    // let logger = CommonLog(env.out)
-    // let logger = ContentsLog(env.out)
-    let logger = DiscardLog
-
     let auth = try
       env.root as AmbientAuth
     else
       env.out.print("unable to use network")
       return
     end
-    env.out.write("Listening at port ")
-    env.out.print(service)
+    env.out.print("Listening at port " + service)
 
     // Start the top server control actor.
-    HTTPServer(
-      auth,
-      ListenHandler(env),
-      BackendMaker.create(env),
-      logger
-      where service=service, host=host, limit=limit, reversedns=auth)
+    HTTPServer(auth, ListenHandler(env), BackendMaker.create(env), DiscardLog
+      where service=service, host="localhost", limit=limit, reversedns=auth)
 
 class ListenHandler
   let _env: Env
@@ -40,7 +27,7 @@ class ListenHandler
   fun ref listening(server: HTTPServer ref) =>
     try
       (let host, let service) = server.local_address().name()?
-      _env.out.print("connected: " + host)
+      None
     else
       _env.out.print("Couldn't get local address.")
       server.dispose()
@@ -62,11 +49,6 @@ class BackendMaker is HandlerFactory
     BackendHandler.create(_env, session)
 
 class BackendHandler is HTTPHandler
-  """
-  Notification class for a single HTTP session.  A session can process
-  several requests, one at a time.  Data recieved using OneshotTransfer
-  transfer mode is echoed in the response.
-  """
   let _env: Env
   let _session: HTTPSession
   var _response: Payload = Payload.response()
@@ -80,7 +62,24 @@ class BackendHandler is HTTPHandler
   fun ref apply(request: Payload val) =>
     _env.out.print(request.url.path)
     if request.url.path=="/" then
-      _response.add_chunk("Hello, this is /")
+      try
+        _response("Content-type") = "text/html"
+        let dir = Directory( FilePath(_env.root as AmbientAuth, ".")? )?
+        let names = dir.entries()?
+        let ns = Sort[ Array[String], String ](consume names)
+        _response.add_chunk("<table border=\"0\">")
+        for s in ns.values() do
+          let info = dir.infoat(s)?
+          if not info.directory then
+            _response.add_chunk("<tr><td><a href=\"/" + s + "\">" + s + "</a> </td><td>"
+                + info.size.string() + "</td></tr>\n")
+          end
+        end
+        _response.add_chunk("</table>")
+      else
+        _response.add_chunk("Hello, this is /")
+      end
+
     else
       try
         let fname = recover val request.url.path.substring(1) end
