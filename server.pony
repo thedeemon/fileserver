@@ -16,7 +16,7 @@ actor Main
 
     // Start the top server control actor.
     HTTPServer(auth, ListenHandler(env), BackendMaker.create(env), DiscardLog
-      where service=service, host="localhost", limit=limit, reversedns=auth)
+      where service=service, host="0.0.0.0", limit=limit, reversedns=auth)
 
 class ListenHandler
   let _env: Env

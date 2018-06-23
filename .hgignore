@@ -1,2 +1,7 @@
 syntax: glob
 .deps/*
+*.exp
+*.ilk
+*.lib
+*.pdb
+*.exe
