@@ -59,43 +59,54 @@ class BackendHandler is HTTPHandler
     _env = env
     _session = session
 
-  fun ref apply(request: Payload val) =>
-    _env.out.print(request.url.path)
-    if request.url.path=="/" then
-      try
+  fun ref showDir(dirname: String, urlpath: String) =>
+    try
         _response("Content-type") = "text/html"
-        let dir = Directory( FilePath(_env.root as AmbientAuth, ".")? )?
+        let dir = Directory( FilePath(_env.root as AmbientAuth, dirname)? )?
         let names = dir.entries()?
         let ns = Sort[ Array[String], String ](consume names)
         _response.add_chunk("<table border=\"0\">")
         for s in ns.values() do
-          let info = dir.infoat(s)?
-          if not info.directory then
-            _response.add_chunk("<tr><td><a href=\"/" + s + "\">" + s + "</a> </td><td>"
+            let info = dir.infoat(s)?
+            let mark = if info.directory then "/" else "" end
+            let link = if urlpath=="" then s else urlpath + "/" + s end
+            _response.add_chunk("<tr><td><a href=\"/" + link + "\">" + s + mark + "</a> </td><td>"
                 + info.size.string() + "</td></tr>\n")
-          end
         end
         _response.add_chunk("</table>")
-      else
-        _response.add_chunk("Hello, this is /")
-      end
+    else
+        _response.add_chunk("Hello, this is " + dirname)
+    end
+    
 
+  fun ref apply(request: Payload val) =>
+    _env.out.print(request.url.path)
+    if request.url.path=="/" then
+        showDir(".", "")
     else
       try
         let fname = recover val request.url.path.substring(1) end
-        let path = FilePath(_env.root as AmbientAuth, fname)?
-        match OpenFile(path)
-        | let f : File =>
-          let sz = f.size()
-          fileOpt = f
-          _response.session = _session
-          _response("Content-type") = mimeType(fname)
-          _response.set_length(sz)
+        let rootFP = FilePath(_env.root as AmbientAuth, ".")?
+        let dir = Directory(rootFP)?
+        // let fp = rootFP.join(fname)
+        let info = dir.infoat(fname)?
+        if info.directory then
+            showDir(fname, fname)
         else
-          _response.add_chunk("File not found")
+            let path = FilePath(_env.root as AmbientAuth, fname)?
+            match OpenFile(path)
+            | let f : File =>
+                let sz = f.size()
+                fileOpt = f
+                _response.session = _session
+                _response("Content-type") = mimeType(fname)
+                _response.set_length(sz)
+            else
+                _response.add_chunk("File not found")
+            end
         end
       else
-        _response.add_chunk("Error opening file")
+            _response.add_chunk("Error opening file")
       end
     end
     _rspVal = _response = Payload.response()
