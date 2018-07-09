@@ -88,7 +88,6 @@ class BackendHandler is HTTPHandler
         let fname = recover val request.url.path.substring(1) end
         let rootFP = FilePath(_env.root as AmbientAuth, ".")?
         let dir = Directory(rootFP)?
-        // let fp = rootFP.join(fname)
         let info = dir.infoat(fname)?
         if info.directory then
             showDir(fname, fname)
@@ -117,7 +116,7 @@ class BackendHandler is HTTPHandler
     | let f : File =>
       while f.errno() is FileOK do
         _rspVal.send_chunk(f.read(32768))
-      end
+      end  
       _rspVal.finish()
     | None => None
     end
